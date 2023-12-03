@@ -30,7 +30,7 @@ class SoundStorage {
       const tx = this.#db.transaction([this.#storeName], "readonly");
       tx.addEventListener("error", (ev) => reject(ev.target.error));
 
-      // Request: Get a single object by ID
+      // Get a single object by ID
       tx.objectStore(this.#storeName)
         .get(id)
         .addEventListener("success", (ev) => resolve(ev.target.result));
@@ -45,7 +45,7 @@ class SoundStorage {
       tx.addEventListener("error", (ev) => reject(ev.target.error));
       tx.addEventListener("complete", () => resolve(res));
 
-      // Requests: Add each file and save the returned ID
+      // Add each file and save the returned ID
       const store = tx.objectStore(this.#storeName);
       Array.from(files).forEach((file, i) =>
         store.add({ bucket, file }).addEventListener("success", (ev) =>
@@ -62,6 +62,39 @@ class SoundStorage {
   // TODO: Implement "Update files" (change bucket or file, needs to pass an ID)
 
   // TODO: Implement "Delete files" (single ID or entire bucket)
+
+  listBuckets = () =>
+    new Promise((resolve, reject) => {
+      let res = {};
+
+      // Transaction handlers
+      const tx = this.#db.transaction([this.#storeName], "readonly");
+      tx.addEventListener("error", (ev) => reject(ev.target.error));
+
+      // Build a map { <bucket_name>: id[] } for the object store
+      tx.objectStore(this.#storeName)
+        .index("bucket")
+        .openKeyCursor()
+        .addEventListener("success", (ev) => {
+          const cursor = ev.target.result;
+          if (!cursor) return resolve(res);
+          res[cursor.key] = [...(res[cursor.key] || []), cursor.primaryKey];
+          cursor.continue();
+        });
+    });
+
+  getBucketFiles = (bucket) =>
+    new Promise((resolve, reject) => {
+      // Transaction handlers
+      const tx = this.#db.transaction([this.#storeName], "readonly");
+      tx.addEventListener("error", (ev) => reject(ev.target.error));
+
+      // Get all files in a bucket
+      tx.objectStore(this.#storeName)
+        .index("bucket")
+        .getAll(bucket)
+        .addEventListener("success", (ev) => resolve(ev.target.result));
+    });
 
   /**
    *

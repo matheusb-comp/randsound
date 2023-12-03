@@ -78,6 +78,7 @@ class SoundPlayer {
       // Execute the loop iteration
       this.#checkSetup();
       await this.playRandomSound();
+      await this.#audioCtx.suspend();
 
       // Schedule the next loop iteration
       const ms = this.#randInt(60000);
@@ -154,6 +155,12 @@ class SoundPlayer {
 
     // Connect the node to the destination (so the sound can be heard)
     source.connect(this.#audioCtx.destination);
+
+    // Make sure the Audio Context is "running" before trying to play
+    // https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state
+    if (["suspended", "interrupted"].includes(this.#audioCtx.state)) {
+      await this.#audioCtx.resume();
+    }
 
     // Play the entire AudioBuffer from the node
     source.start();

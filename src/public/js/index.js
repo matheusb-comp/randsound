@@ -1,6 +1,22 @@
 import SoundPlayer from "./player.js";
 import SoundStorage from "./storage.js";
 
+// TODO: Organize
+const storage = new SoundStorage();
+const player = new SoundPlayer();
+window.ss = storage;
+window.sp = player;
+
+//
+storage
+  .setup()
+  .then(() => console.log("READY: Sound Storage"))
+  .catch(console.error);
+// player
+//   .setup()
+//   .then(() => console.log("READY: Sound Player"))
+//   .catch(console.error);
+
 //
 const btnSaveFiles = document.getElementById("btn-save-files");
 const fileNameList = document.getElementById("list-uploaded-files");
@@ -31,17 +47,19 @@ btnSaveFiles.addEventListener("click", (ev) => {
   if (!inputFiles?.files?.length) return;
 
   // TODO: Implement real indexedDB "save" async method
-  const fakeSave = () => new Promise((res, rej) => {
-    const ms = Math.floor(Math.random() * 5000);
-    setTimeout(() => ms <= 500 ? rej(new Error('FAKE ERROR')) : res(), ms);
-  });
+  // const fakeSave = () =>
+  //   new Promise((res, rej) => {
+  //     const ms = Math.floor(Math.random() * 5000);
+  //     setTimeout(() => (ms <= 500 ? rej(new Error("FAKE ERROR")) : res()), ms);
+  //   });
 
   //
   const label = btn.innerText;
-  btn.innerText = "Salvando...";
+  btn.innerText = "Saving...";
   btn.disabled = true;
   inputFiles.disabled = true;
-  fakeSave(inputFiles.files)
+  storage
+    .addFilesToBucket("single_bucket", inputFiles.files)
     .then(() => {
       fileNameList.innerHTML = "";
       inputFiles.value = "";
@@ -55,12 +73,6 @@ btnSaveFiles.addEventListener("click", (ev) => {
       inputFiles.disabled = false;
     });
 });
-
-// TODO: Organize
-const sp = new SoundPlayer();
-const ss = new SoundStorage();
-window.sp = sp;
-window.ss = ss;
 
 // const audioPing = document.getElementById("ping");
 
