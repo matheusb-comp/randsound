@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.95em%22%20font-size%3D%2280%22%3E%F0%9F%8E%B6%3C%2Ftext%3E%3C%2Fsvg%3E"
+    />
     <title>Document</title>
   </head>
   <body>
@@ -14,6 +18,16 @@
 
     <hr />
 
+    <!-- File upload control -->
+    <p>
+      <input id="upload-sound-files" type="file" accept="audio/*" multiple />
+    </p>
+    <div id="list-uploaded-files"></div>
+    <p>
+      <button id="btn-save-files" type="button" disabled>Salvar</button>
+    </p>
+
+    <!--
     <button id="btn_ping_play">PLAY</button>
     <button id="btn_ping_pause">PAUSE</button>
 
@@ -21,6 +35,7 @@
 
     <button id="btn_sound_1">PLAY SOUND 1</button>
     <button id="btn_sound_2">PLAY SOUND 2</button>
+    -->
 
     <script type="module" src="js/index.js"></script>
   </body>
