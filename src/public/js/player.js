@@ -19,6 +19,10 @@ class SoundPlayer {
    * @type {AudioContext}
    */
   #audioCtx;
+  /**
+   * @type {AudioBufferSourceNode | null}
+   */
+  #audioNode;
   #playTimeout;
 
   constructor() {
@@ -54,11 +58,13 @@ class SoundPlayer {
   };
 
   #cleanup = () => {
+    this.stopSound();
     this.#saveTimer();
     this.#audioCtx?.close().catch(() => {});
 
     this.#status = "waiting_setup";
     this.#audioCtx = null;
+    this.#audioNode = null;
     this.#config = {};
   };
 
@@ -102,6 +108,12 @@ class SoundPlayer {
     return await this.#playSound(data);
   };
 
+  stopSound = () => {
+    this.#audioNode?.stop();
+    this.#audioNode = null;
+    if (this.#status === "playing") this.#status = "stopped";
+  };
+
   /**
    * @param {SoundData} soundData
    * @returns {Promise<void>}
@@ -111,8 +123,7 @@ class SoundPlayer {
     if (!id || typeof getBytes !== "function") throw new Error("Bad soundData");
 
     // Change the player status
-    const oldStatus = this.#status;
-    if (oldStatus === "playing") throw new Error("Already playing a sound");
+    if (this.#status === "playing") throw new Error("Already playing a sound");
     this.#status = "playing";
     console.debug("Playing sound ID:", id);
 
@@ -122,17 +133,17 @@ class SoundPlayer {
       if (!(bytes instanceof ArrayBuffer)) throw new Error("Bad bytes");
 
       // Configure an AudioBufferSourceNode and start playing
-      const audioNode = await this.#playAudioData(bytes);
+      this.#audioNode = await this.#playAudioData(bytes);
 
       // Return a promise that resolves when the sound ends
       return new Promise((resolve) => {
-        audioNode.addEventListener("ended", () => {
-          if (this.#status === "playing") this.#status = oldStatus;
+        this.#audioNode.addEventListener("ended", () => {
+          this.stopSound();
           resolve();
         });
       });
     } catch (err) {
-      if (this.#status === "playing") this.#status = oldStatus;
+      this.stopSound();
       throw err;
     }
   };
