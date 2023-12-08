@@ -10,51 +10,104 @@
     <title>Document</title>
   </head>
   <body>
-    <audio id="ping" controls>
-      <!-- <source src="media/test_sound/ping.mp3" type="audio/mpeg"> -->
-      <!-- <source src="media/test_sound/ping.oga" type="audio/ogg"> -->
-      <p>Sorry, your browser does not support this feature (HTML audio tag).</p>
-    </audio>
+    <h1>RANDsound</h1>
 
     <hr />
 
     <!-- File upload control -->
-    <p>
-      <input id="upload-sound-files" type="file" accept="audio/*" multiple />
-    </p>
-    <div id="list-uploaded-files"></div>
-    <p>
-      <button id="btn-save-files" type="button" disabled>Save</button>
-    </p>
+
+    <form id="form-upload-sound-files">
+      <div>
+        <label for="up-sound-files">Files:</label>
+        <input
+          id="up-sound-files"
+          name="sound_files"
+          type="file"
+          accept="audio/*"
+          multiple
+        />
+      </div>
+      <div id="up-sound-file-list"></div>
+      <div>
+        <label for="up-sound-bucket-name">Bucket Name:</label>
+        <input id="up-sound-bucket-name" name="bucket_name" type="text" />
+      </div>
+      <div>
+        <button name="submit" type="submit" disabled>Save</button>
+      </div>
+    </form>
 
     <hr />
 
     <!-- Sound buckets -->
 
-    <!-- TODO: Choose and load "bucket" into player -->
     <div id="list-buckets">Checking bucket list...</div>
-    <p>
-      <button id="btn-load-bucket" type="button" disabled>Setup bucket</button>
-    </p>
+    <form id="form-choose-bucket">
+      <select name="bucket">
+        <option value="">Choose bucket</option>
+      </select>
+      <button name="submit" type="submit" disabled>Setup bucket</button>
+    </form>
 
     <hr />
 
     <!-- Sound player control -->
 
-    <!-- TODO: Start/stop player -->
-    <p>
-      <button id="btn-toggle-player" type="button" disabled>PLAY</button>
-    </p>
-
-    <!--
-    <button id="btn_ping_play">PLAY</button>
-    <button id="btn_ping_pause">PAUSE</button>
+    <form id="form-config-player">
+      <div>
+        <label for="cfg-player-play-chance">Play Chance:</label>
+        <input
+          id="cfg-player-play-chance"
+          name="play_chance"
+          type="number"
+          step="0.01"
+          min="0"
+          max="1"
+        />
+      </div>
+      <span>
+        The percentage of the chance for a sound to actually play at the start
+        of a Cycle.
+      </span>
+      <div>
+        <label for="cfg-player-cycle-duration">Cycle Duration:</label>
+        <input
+          id="cfg-player-cycle-duration"
+          name="cycle_duration"
+          type="number"
+          step="100"
+          min="0"
+        />
+      </div>
+      <span>
+        Time (in milliseconds) between each attempt at playing a sound.
+      </span>
+      <div>
+        <label for="cfg-player-cycle-delta">Cycle Delta:</label>
+        <input
+          id="cfg-player-cycle-delta"
+          name="cycle_delta"
+          type="number"
+          step="1"
+          min="0"
+        />
+      </div>
+      <span>
+        Delta to randomly add or subtract from the Cycle Duration each time a
+        Cycle starts.
+      </span>
+      <div>
+        <button name="submit" type="submit">Set Config</button>
+      </div>
+    </form>
 
     <hr />
 
-    <button id="btn_sound_1">PLAY SOUND 1</button>
-    <button id="btn_sound_2">PLAY SOUND 2</button>
-    -->
+    <!-- Sound player start/stop -->
+
+    <p>
+      <button id="btn-toggle-player" type="button" disabled>PLAY</button>
+    </p>
 
     <script type="module" src="js/index.js"></script>
   </body>
