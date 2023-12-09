@@ -96,6 +96,28 @@ class SoundStorage {
         .addEventListener("success", (ev) => resolve(ev.target.result));
     });
 
+  deleteBucketFiles = (bucket) =>
+    new Promise((resolve, reject) => {
+      let res = 0;
+
+      // Transaction handlers
+      const tx = this.#db.transaction([this.#storeName], "readwrite");
+      tx.addEventListener("error", (ev) => reject(ev.target.error));
+
+      // Delete all elements in the key index (<key,primaryKey>)
+      const store = tx.objectStore(this.#storeName);
+      store
+        .index("bucket")
+        .openKeyCursor(bucket)
+        .addEventListener("success", (ev) => {
+          const cursor = ev.target.result;
+          if (!cursor) return resolve(res);
+          store.delete(cursor.primaryKey);
+          res++;
+          cursor.continue();
+        });
+    });
+
   /**
    *
    * @param {string} dbName

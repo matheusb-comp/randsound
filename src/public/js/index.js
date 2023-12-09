@@ -1,21 +1,21 @@
 import SoundPlayer from "./player.js";
 import SoundStorage from "./storage.js";
 
-// TODO: Organize
 const storage = new SoundStorage();
 const player = new SoundPlayer();
 window.ss = storage;
 window.sp = player;
 
-// player
-//   .setup()
-//   .then(() => console.log("READY: Sound Player"))
-//   .catch(console.error);
-
 //
 const formUploadSoundFiles = document.getElementById("form-upload-sound-files");
 const fileNameList = document.getElementById("up-sound-file-list");
 const inputFiles = document.getElementById("up-sound-files");
+
+const formChooseBucket = document.getElementById("form-choose-bucket");
+const formConfigPlayer = document.getElementById("form-config-player");
+const btnPlay = document.getElementById("btn-toggle-player");
+
+let loadedBucketFiles = {};
 
 //
 inputFiles.addEventListener("change", (ev) => {
@@ -70,11 +70,6 @@ formUploadSoundFiles.addEventListener("submit", (ev) => {
 
 //////
 
-const formChooseBucket = document.getElementById("form-choose-bucket");
-const btnPlay = document.getElementById("btn-toggle-player");
-
-let loadedBucketFiles = {};
-
 const readFileAsArrayBuffer = (file, signal = null) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -101,6 +96,7 @@ formChooseBucket.addEventListener("submit", (ev) => {
   //
   const form = ev.target;
   const bucketName = form.bucket.value;
+  if (!bucketName) return console.warn("Empty bucket name chosen.");
 
   // TODO: Get chosen bucket name from somewhere
   storage
@@ -115,7 +111,10 @@ formChooseBucket.addEventListener("submit", (ev) => {
 
       //
       const sounds = objects.map((o) => ({ id: o.id, getBytes }));
-      player.setup({ sounds });
+      player.loadSounds(sounds).catch((err) => {
+        console.error(err);
+        console.error("messages:", err.messages);
+      });
 
       //
       btnPlay.innerText = "PLAY";
@@ -124,13 +123,42 @@ formChooseBucket.addEventListener("submit", (ev) => {
     .catch();
 });
 
-btnPlay.addEventListener("click", (ev) => {
-  const btn = ev.target;
-  btn.innerText = btn.innerText === "PLAY" ? "STOP" : "PLAY";
+formConfigPlayer.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const form = ev.target;
+  const cfg = {
+    playChance: form.play_chance.value,
+    cycleDuration: form.cycle_duration.value,
+    cycleDelta: form.cycle_delta.value,
+  };
 
-  console.log("player status:", player.status);
-  if (player.status === "stopped") player.start();
-  else player.stopSound();
+  form.submit.disabled = true;
+  player
+    .loadConfig(cfg)
+    .then(() => {
+      //
+      btnPlay.innerText = "PLAY";
+      btnPlay.disabled = false;
+    })
+    .catch((err) => {
+      console.error(err);
+      console.error("messages:", err.messages);
+    })
+    .finally(() => {
+      form.submit.disabled = false;
+    });
+});
+
+btnPlay.addEventListener("click", (ev) => {
+  console.log("BTN-PLAY - player status:", player.status);
+  const btn = ev.target;
+  btn.disabled = true;
+  Promise.resolve(player.isRunning ? player.stop() : player.start()).finally(
+    () => {
+      btn.innerText = btn.innerText === "PLAY" ? "STOP" : "PLAY";
+      btn.disabled = false;
+    }
+  );
 });
 
 const listSoundBuckets = () => {
@@ -149,6 +177,21 @@ const listSoundBuckets = () => {
       //
       let p = document.createElement("p");
       p.innerText = b + ": " + JSON.stringify(buckets[b]);
+      let trash = document.createElement("button");
+      trash.type = "button";
+      trash.innerText = "X";
+      trash.dataset.bucketName = b;
+      trash.addEventListener("click", (ev) => {
+        const btn = ev.target;
+        const { bucketName } = btn.dataset || {};
+        console.log("btn:", btn, "bucketName:", bucketName);
+        const ok = window.confirm(`Confirm deleting bucket ${bucketName}?`);
+        if (ok)
+          storage.deleteBucketFiles(bucketName).then(() => {
+            btn.parentElement?.remove();
+          });
+      });
+      p.appendChild(trash);
       div.appendChild(p);
     }
 

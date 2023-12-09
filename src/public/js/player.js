@@ -12,66 +12,165 @@
  * @property {Object} extra
  */
 
+/**
+ * @typedef {Object} SoundPlayerConfig
+ * @property {number} playChance
+ * @property {number} cycleDuration
+ * @property {number} cycleDelta
+ */
+
+/**
+ * Default config object.
+ * Play sound every 30 seconds.
+ *
+ * @type {SoundPlayerConfig}
+ */
+export const DEFAULT_CONFIG = Object.freeze({
+  playChance: 1,
+  cycleDuration: 30000,
+  cycleDelta: 0,
+});
+
 class SoundPlayer {
+  /**
+   * @type {string}
+   */
   #status;
+
+  /**
+   * @type {SoundData[]}
+   */
+  #sounds;
+
+  /**
+   * @type {SoundPlayerConfig}
+   */
   #config;
+
+  /**
+   * @type {number}
+   */
+  #playTimeout;
+
   /**
    * @type {AudioContext}
    */
   #audioCtx;
+
   /**
    * @type {AudioBufferSourceNode | null}
    */
   #audioNode;
-  #playTimeout;
 
   constructor() {
-    this.#cleanup();
+    this.#setDefaultAttributes();
   }
 
   get status() {
     return this.#status;
   }
 
-  get #el() {
-    const id = this.#config.dom_id;
-    const element = document.getElementById(id);
-    if (!element) throw new Error(`DOM: <audio> element #${id} not found`);
-    return element;
+  get isPlaying() {
+    return this.status === "playing";
   }
 
-  setup = async (config) => {
-    // TODO: Validate config
-    this.#cleanup();
+  get isRunning() {
+    return this.#playTimeout !== null;
+  }
 
-    this.#status = "stopped";
-    this.#audioCtx = new AudioContext();
-    this.#config = { ...config };
+  loadSounds = async (sounds) => {
+    // Sounds validation
+    const errors = Array.from(sounds).reduce((all, el, i) => {
+      const { id, getBytes, extra } = el || {};
+      let err = {};
+      if (!id) err.id = "ID must be provided.";
+      if (typeof getBytes !== "function")
+        err.getBytes = "A function to get the sound bytes is required.";
+      if (extra && extra?.constructor?.name !== "Object")
+        err.extra = "If any extra data is provided, it must be an object.";
+      if (Object.keys(err).length) {
+        all[i] = Object.assign(all?.[i] || {}, err);
+      }
+      return all;
+    }, {});
+    if (Object.keys(errors).length) {
+      let err = new TypeError("Invalid sounds (check messages attribute).");
+      err.messages = errors;
+      throw err;
+    }
+
+    // Stop playing and set the new sounds
+    await this.stop();
+    this.#sounds = Array.from(sounds).map((el) => ({
+      id: el.id,
+      getBytes: el.getBytes,
+      extra: el.extra,
+    }));
   };
 
-  start = () => {
-    this.#checkSetup();
+  loadConfig = async (config) => {
+    // Config validation
+    const { playChance, cycleDuration, cycleDelta } = config || {};
+    let errors = {};
+    if (isNaN(playChance) || playChance < 0 || playChance > 1)
+      errors.playChance = "Must be a percentage [0,1].";
+    if (isNaN(cycleDuration) || cycleDuration < 0)
+      errors.cycleDuration = "Must be positive.";
+    if (isNaN(cycleDelta) || cycleDelta < 0)
+      errors.cycleDelta = "Must be positive.";
+    if (Object.keys(errors).length) {
+      let err = new TypeError("Invalid config (check messages attribute).");
+      err.messages = errors;
+      throw err;
+    }
 
-    const ms = this.#randInt(5000);
+    // Stop playing and set the new config
+    await this.stop();
+    this.#config = {
+      playChance: Number(playChance),
+      cycleDuration: Math.floor(cycleDuration),
+      cycleDelta: Math.floor(cycleDelta),
+    };
+  };
+
+  stop = async () => {
+    this.#saveTimer(null);
+    await this.#stopSound();
+  };
+
+  start = (delay = 0) => {
+    if (this.isRunning) return 0;
+
+    const ms = delay >= 0 ? delay : this.#randInt(5000);
     this.#saveTimer(setTimeout(this.#timerLoop, ms));
     console.debug(`STARTING IN ${ms}ms...`);
+    return ms;
   };
 
-  #cleanup = () => {
-    this.stopSound();
-    this.#saveTimer();
-    this.#audioCtx?.close().catch(() => {});
-
-    this.#status = "waiting_setup";
-    this.#audioCtx = null;
-    this.#audioNode = null;
-    this.#config = {};
-  };
-
-  #checkSetup = () => {
-    if (this.status === "waiting_setup") {
-      throw new Error("Please call setup first");
+  playRandomSound = async () => {
+    if (!this.#sounds.length) {
+      console.warn("Empty sound list: Impossible to play.");
+      return;
     }
+
+    const idx = this.#randInt(this.#sounds.length);
+    return await this.playSound(idx);
+  };
+
+  playSound = async (idx) => {
+    const data = this.#sounds?.[idx];
+    if (!data) throw new Error(`Sound at position ${idx} not found.`);
+
+    return await this.#playSound(data);
+  };
+
+  #setDefaultAttributes = () => {
+    this.#playTimeout = null;
+    this.#audioNode = null;
+    this.#audioCtx = new AudioContext();
+    this.#sounds = [];
+    this.#config = DEFAULT_CONFIG;
+    this.#status = "stopped";
   };
 
   #saveTimer = (timer = null) => {
@@ -79,39 +178,35 @@ class SoundPlayer {
     this.#playTimeout = timer;
   };
 
+  #cleanup = async () => {
+    await this.stop();
+    await this.#audioCtx?.close().catch(() => {});
+    this.#setDefaultAttributes();
+  };
+
   #timerLoop = async () => {
     try {
-      // Execute the loop iteration
-      this.#checkSetup();
-      await this.playRandomSound();
-      await this.#audioCtx.suspend();
+      // Brother, you gotta roll the dice!
+      const lim = this.#config.playChance;
+      if (Math.random() <= lim) await this.playRandomSound();
 
-      // Schedule the next loop iteration
-      const ms = this.#randInt(60000);
-      const timer = setTimeout(this.#timerLoop, ms);
-      this.#saveTimer(timer);
+      // Wait some time before trying again...
+      const dt = this.#config.cycleDelta;
+      const ms = this.#config.cycleDuration + this.#randInt(dt || 1, -1 * dt);
+      this.#saveTimer(setTimeout(this.#timerLoop, ms));
       console.debug(`Next sound in ${ms}ms...`);
     } catch (err) {
       // "Finish the cycle of eternal return"
       console.error(err);
-      this.#cleanup();
+      await this.#cleanup();
     }
   };
 
-  playRandomSound = async () => {
-    this.#checkSetup();
-
-    const { sounds } = this.#config;
-    if (!sounds?.length) throw new Error("Empty sound list");
-
-    const data = sounds[this.#randInt(sounds.length)];
-    return await this.#playSound(data);
-  };
-
-  stopSound = () => {
+  #stopSound = async () => {
     this.#audioNode?.stop();
     this.#audioNode = null;
-    if (this.#status === "playing") this.#status = "stopped";
+    await this.#audioCtx.suspend().catch(() => {});
+    if (this.isPlaying) this.#status = "stopped";
   };
 
   /**
@@ -123,7 +218,7 @@ class SoundPlayer {
     if (!id || typeof getBytes !== "function") throw new Error("Bad soundData");
 
     // Change the player status
-    if (this.#status === "playing") throw new Error("Already playing a sound");
+    if (this.isPlaying) throw new Error("Already playing a sound");
     this.#status = "playing";
     console.debug("Playing sound ID:", id);
 
@@ -138,12 +233,11 @@ class SoundPlayer {
       // Return a promise that resolves when the sound ends
       return new Promise((resolve) => {
         this.#audioNode.addEventListener("ended", () => {
-          this.stopSound();
-          resolve();
+          this.#stopSound().then(resolve);
         });
       });
     } catch (err) {
-      this.stopSound();
+      await this.#stopSound();
       throw err;
     }
   };
@@ -155,8 +249,6 @@ class SoundPlayer {
    * @see https://developer.mozilla.org/en-US/docs/Web/API/AudioBufferSourceNode
    */
   #playAudioData = async (bytes) => {
-    this.#checkSetup();
-
     // Create the AudioBuffer (designed for small snippets, less than 45s)
     const buffer = await this.#audioCtx.decodeAudioData(bytes);
 
